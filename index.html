@@ -543,6 +543,10 @@ select.form-input { cursor: pointer; }
   /* Modals — full width on tablet */
   .modal { max-width: 95vw !important; padding: 22px; }
 
+  /* Wallet picker — stack on tablet */
+  #walletPickerModal > div { flex-direction: column; max-width: 95vw !important; }
+  #walletPickerModal > div > div:first-child { width: 100% !important; border-right: none; border-bottom: 0.5px solid rgba(255,255,255,0.08); }
+
   /* Will page contract details — allow wrapping */
   #willContractLink { word-break: break-all; font-size: 11px; }
 }
@@ -554,11 +558,14 @@ select.form-input { cursor: pointer; }
   .two-col    { grid-template-columns: 1fr; gap: 8px; }
 
   /* Topbar — tighter */
-  .topbar { height: 48px; padding: 0 12px; }
+  .topbar { height: 52px; padding: 0 12px; }
   .topbar-crumb { font-size: 11px; }
-  .topbar-right .btn-ghost { display: none; }
+  /* Hide ghost btn but NOT the connect wallet button */
+  .topbar-right .btn-ghost:not(#connectBtn) { display: none; }
   .hb-btn-label { display: none; }
   #wrongNetworkBtn { font-size: 10px; padding: 4px 8px; }
+  /* Make connect button more compact on mobile */
+  #connectBtn { font-size: 11px; padding: 6px 10px; }
 
   /* Pages */
   .page { padding: 12px 12px 80px; }
@@ -657,6 +664,8 @@ select.form-input { cursor: pointer; }
   .card { padding: 10px; }
   .btn-pink { font-size: 12px; padding: 8px 14px; }
   .sidebar { width: 90vw; }
+  /* Hide wallet info panel on tiny screens */
+  #walletInfoPanel { display: none; }
 }
 
 /* ── Large screens (≥1400px) ── */
@@ -1132,7 +1141,7 @@ select.form-input { cursor: pointer; }
       <div class="card card-accent" style="margin-bottom:14px;">
         <div class="card-header"><span class="card-title">Contract Details</span><span class="badge badge-live">Live</span></div>
         <div style="font-family:'DM Mono',monospace;font-size:12px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Address</span><a id="willContractLink" href="#" target="_blank" style="color:var(--pk-pink);text-decoration:none;">—</a></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Address</span><a id="willContractLink" href="#" target="_blank" style="color:var(--pk-pink);text-decoration:none;">View</a></div>
           <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Network</span><span>Polkadot Hub TestNet</span></div>
           <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Owner</span><span id="willOwner">Loading</span></div>
           <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Interval</span><span id="willInterval">Loading</span></div>
@@ -1448,7 +1457,7 @@ function openWalletPicker() {
       </div>`;
   } else {
     instSection.style.display = 'block';
-    popSection.style.display  = 'none'; // hide popular — we only show real wallets
+    popSection.style.display  = 'none'; // hide popular, only show real wallets
     instList.innerHTML = installed.map((w, i) => `
       <button onclick="connectWithWallet(${i})"
         style="width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:transparent;border:none;cursor:pointer;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:2px;transition:background .12s;"
