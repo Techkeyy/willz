@@ -1080,29 +1080,6 @@ select.form-input { cursor: pointer; }
 </div>
 
 <!-- ══ WALLET PICKER MODAL ════════════════════════════════ -->
-<div class="overlay" id="walletPickerModal">
-  <div class="modal" style="max-width:420px;">
-    <div class="modal-title">
-      Connect a Wallet
-      <button class="mclose" onclick="closeM('walletPickerModal')">✕</button>
-    </div>
-
-    <!-- Detected wallets -->
-    <div id="installedWallets" style="margin-bottom:16px;">
-      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:10px;">INSTALLED</div>
-      <div id="walletList" style="display:flex;flex-direction:column;gap:8px;"></div>
-    </div>
-
-    <!-- What is a wallet -->
-    <div class="divider"></div>
-    <div style="text-align:center;padding:16px 0 4px;">
-      <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:6px;">New to wallets?</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">A wallet lets you connect to Web3 apps and manage your crypto assets securely.</div>
-      <a href="https://metamask.io/download/" target="_blank" class="btn btn-outline-pink btn-sm" style="text-decoration:none;">Get MetaMask →</a>
-    </div>
-  </div>
-</div>
-
 <!-- ══ HEARTBEAT MODAL ════════════════════════════════════ -->
 <div class="overlay" id="hbModal">
   <div class="modal">
@@ -1128,7 +1105,7 @@ select.form-input { cursor: pointer; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
 <script>
-let web3Modal = null; // placeholder — we use custom modal below
+let web3Modal = null; // unused — keeping for reference only
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const FACTORY_ADDRESS  = '0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6';
@@ -1264,79 +1241,24 @@ function showPage(id, el) {
 }
 
 // ─── WALLET CONNECT ────────────────────────────────────────────────────────
-function connectWallet() {
-  openWalletPicker();
-}
-
-function openWalletPicker() {
-  const list = document.getElementById('walletList');
-  list.innerHTML = '';
-
-  // Detect available wallets
-  const wallets = [];
-
-  if (window.ethereum) {
-    // Check for specific wallets via provider properties
-    const providers = window.ethereum.providers || [window.ethereum];
-    providers.forEach(p => {
-      if (p.isMetaMask && !p.isRabby)    wallets.push({ name: 'MetaMask',    icon: '🦊', provider: p });
-      if (p.isRabby)                      wallets.push({ name: 'Rabby',       icon: '🐰', provider: p });
-      if (p.isCoinbaseWallet)             wallets.push({ name: 'Coinbase',    icon: '🔵', provider: p });
-      if (p.isBraveWallet)                wallets.push({ name: 'Brave',       icon: '🦁', provider: p });
-    });
-
-    // Fallback — just show MetaMask if we couldn't identify specifically
-    if (wallets.length === 0 && window.ethereum.isMetaMask) {
-      wallets.push({ name: 'MetaMask', icon: '🦊', provider: window.ethereum });
-    }
-    if (wallets.length === 0 && window.ethereum) {
-      wallets.push({ name: 'Browser Wallet', icon: '🌐', provider: window.ethereum });
-    }
+async function connectWallet() {
+  if (typeof window.ethereum === 'undefined') {
+    alert('No wallet found!\n\nInstall MetaMask from metamask.io then refresh.\n\nThe app will automatically add Polkadot Hub TestNet for you.');
+    return;
   }
-
-  if (wallets.length === 0) {
-    list.innerHTML = `
-      <div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;background:var(--surface2);border-radius:8px;">
-        No wallet detected.<br/>
-        <a href="https://metamask.io/download/" target="_blank" style="color:var(--pk-pink);">Install MetaMask</a> then refresh.
-      </div>`;
-  } else {
-    wallets.forEach(w => {
-      const btn = document.createElement('button');
-      btn.style.cssText = `width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:10px;background:var(--surface2);border:0.5px solid var(--border2);cursor:pointer;transition:all .15s;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;`;
-      btn.innerHTML = `
-        <span style="font-size:24px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--surface3);border-radius:8px;">${w.icon}</span>
-        <span style="flex:1;text-align:left;">${w.name}</span>
-        <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--green);background:var(--green-dim);padding:3px 8px;border-radius:4px;">Detected</span>
-      `;
-      btn.onmouseover = () => { btn.style.borderColor = 'var(--border-pink)'; btn.style.background = 'var(--pink-dim)'; };
-      btn.onmouseout  = () => { btn.style.borderColor = 'var(--border2)';     btn.style.background = 'var(--surface2)'; };
-      btn.onclick = () => { closeM('walletPickerModal'); connectWithProvider(w.provider); };
-      list.appendChild(btn);
-    });
-  }
-
-  document.getElementById('walletPickerModal').classList.add('open');
-}
-
-async function connectWithProvider(walletProvider) {
   try {
-    // Revoke then re-request to force account picker
+    // Force account picker every time
     try {
-      await walletProvider.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] });
+      await window.ethereum.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] });
     } catch(e) {}
+    await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
 
-    await walletProvider.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
-
-    provider        = new ethers.BrowserProvider(walletProvider);
+    provider        = new ethers.BrowserProvider(window.ethereum);
     await provider.send('eth_requestAccounts', []);
     signer          = await provider.getSigner();
     walletAddress   = await signer.getAddress();
     factoryContract = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, signer);
     walletConnected = true;
-
-    // Override window.ethereum with chosen provider for subsequent calls
-    window._activeProvider = walletProvider;
 
     await switchNetwork();
     await checkNetwork();
@@ -1351,13 +1273,13 @@ async function connectWithProvider(walletProvider) {
     const connectBtn = document.getElementById('connectBtn');
     connectBtn.textContent = short;
     connectBtn.style.color = 'var(--green)';
-    connectBtn.onclick     = openWalletPicker;
+    connectBtn.onclick     = null;
 
     await fetchWalletBalance();
     await checkUserWill();
 
-    walletProvider.on?.('chainChanged',    () => { checkNetwork(); fetchWalletBalance(); });
-    walletProvider.on?.('accountsChanged', () => window.location.reload());
+    window.ethereum.on('chainChanged',    () => { checkNetwork(); fetchWalletBalance(); });
+    window.ethereum.on('accountsChanged', () => window.location.reload());
 
   } catch(e) {
     if (e.code === 4001) { showToast('Connection cancelled.', true); return; }
@@ -1403,7 +1325,6 @@ function _resetWalletState() {
 }
 
 function disconnectWallet() {
-  window._activeProvider = null;
   _resetWalletState();
   showToast('Wallet disconnected.');
 }
