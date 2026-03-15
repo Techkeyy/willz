@@ -1212,7 +1212,18 @@ async function connectWallet() {
     return;
   }
   try {
-    // Force MetaMask to show account selection dialog every time
+    // Revoke existing permissions first, then request fresh
+    // This forces MetaMask to show the account picker every single time
+    try {
+      await window.ethereum.request({
+        method: 'wallet_revokePermissions',
+        params: [{ eth_accounts: {} }]
+      });
+    } catch(e) {
+      // wallet_revokePermissions not supported on all versions — ignore
+    }
+
+    // Now request fresh — always shows account picker
     await window.ethereum.request({
       method: 'wallet_requestPermissions',
       params: [{ eth_accounts: {} }]
@@ -1695,7 +1706,15 @@ async function checkNetwork() {
 }
 
 function disconnectWallet() {
-  // MetaMask doesn't have a true disconnect API — we reset our app state
+  // Revoke MetaMask permissions so next connect shows account picker
+  if (typeof window.ethereum !== 'undefined') {
+    window.ethereum.request({
+      method: 'wallet_revokePermissions',
+      params: [{ eth_accounts: {} }]
+    }).catch(() => {}); // ignore if not supported
+  }
+
+  // Reset app state
   walletConnected  = false;
   walletAddress    = '';
   provider         = null;
