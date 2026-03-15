@@ -2,9 +2,19 @@
 
 > **Polkadot Solidity Hackathon 2026** | Track: EVM Smart Contract — AI-powered dApp
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-dotwill.vercel.app-E6007A?style=flat&logo=vercel&logoColor=white)](https://dotwill.vercel.app)
 [![Polkadot Hub](https://img.shields.io/badge/Deployed%20on-Polkadot%20Hub%20TestNet-E6007A?style=flat&logo=polkadot&logoColor=white)](https://blockscout-testnet.polkadot.io/address/0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20-363636?style=flat&logo=solidity)](https://soliditylang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+---
+
+## Live Demo
+
+🌐 **[dotwill.vercel.app](https://dotwill.vercel.app)**
+
+> Requires MetaMask. The app automatically adds Polkadot Hub TestNet and prompts for test PAS tokens.
+> Get free PAS tokens at [faucet.polkadot.io](https://faucet.polkadot.io/?parachain=1000)
 
 ---
 
