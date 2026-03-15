@@ -1,5 +1,4 @@
-# DotWill
-#On-Chain Inheritance on Polkadot Hub
+# DotWill — On-Chain Inheritance on Polkadot Hub
 
 > **Polkadot Solidity Hackathon 2026** | Track: EVM Smart Contract — AI-powered dApp
 
