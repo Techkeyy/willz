@@ -2,7 +2,7 @@
 
 > **Polkadot Solidity Hackathon 2026** | Track: EVM Smart Contract — AI-powered dApp
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-willz.vercel.app-E6007A?style=flat&logo=vercel&logoColor=white)](https://dotwill.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-willz.vercel.app-E6007A?style=flat&logo=vercel&logoColor=white)](https://willz.vercel.app)
 [![Polkadot Hub](https://img.shields.io/badge/Deployed%20on-Polkadot%20Hub%20TestNet-E6007A?style=flat&logo=polkadot&logoColor=white)](https://blockscout-testnet.polkadot.io/address/0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20-363636?style=flat&logo=solidity)](https://soliditylang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 ## Live Demo
 
-🌐 **[willz.vercel.app](https://willz.vercel.app/)**
+🌐 **[willz.vercel.app](https://willz.vercel.app)**
 
 > Requires MetaMask. The app automatically adds Polkadot Hub TestNet and prompts for test PAS tokens.
 > Get free PAS tokens at [faucet.polkadot.io](https://faucet.polkadot.io/?parachain=1000)
@@ -86,7 +86,7 @@ Deploy Will → Set Beneficiaries → Fund Vault → Send Heartbeats
 
 | Contract | Network | Address |
 |---|---|---|
-| `DotWillFactory` | Polkadot Hub TestNet | [`0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6`](https://blockscout-testnet.polkadot.io/address/0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6) |
+| `DotWillFactory` | Polkadot Hub TestNet | [`0x00Bc1Ff48812A45fe75385Ffb57e0284310B0F1c`](https://blockscout-testnet.polkadot.io/address/0x00Bc1Ff48812A45fe75385Ffb57e0284310B0F1c) |
 | `DotWillV2` (example) | Polkadot Hub TestNet | [`0xc4a3FAd2e79Bf5B50d1063697A5e8095Ccc829cb`](https://blockscout-testnet.polkadot.io/address/0xc4a3FAd2e79Bf5B50d1063697A5e8095Ccc829cb) |
 
 **Network details:**
