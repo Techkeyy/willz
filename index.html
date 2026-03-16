@@ -1357,6 +1357,7 @@ const WILL_ABI = [
   'event WillTriggered(address indexed triggeredBy, uint256 timestamp)',
   'event Claimed(address indexed beneficiary, uint256 amount, uint256 shareBps)',
   'event Deposited(address indexed from, uint256 amount)',
+  'event Revoked(address indexed owner, uint256 refundAmount)',
   'event BeneficiariesUpdated(uint256 count)',
   'event IntervalUpdated(uint256 newInterval, uint256 newGrace)',
   'event MessageStored(address indexed owner, uint256 timestamp)',
@@ -1832,7 +1833,7 @@ async function loadHistory() {
   const feed = document.getElementById('historyFeed');
   if (!feed) return;
   if (!userWillAddress) {
-    feed.innerHTML = `<div style="color:var(--muted);font-size:13px;">No will deployed yet.</div>`;
+    feed.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0;">No will deployed yet. Set up your will first.</div>`;
     return;
   }
   feed.innerHTML = `<div style="color:var(--muted);font-size:13px;">Loading on-chain events...</div>`;
@@ -1842,15 +1843,23 @@ async function loadHistory() {
     const currentBlock = await rp.getBlockNumber();
     const fromBlock    = Math.max(0, currentBlock - 50000);
 
-    const safeQuery = async (filter) => { try { return await rc.queryFilter(filter, fromBlock); } catch(e) { return []; } };
+    const safeQuery = async (filterFn) => {
+      try {
+        const filter = filterFn();
+        return await rc.queryFilter(filter, fromBlock);
+      } catch(e) {
+        console.warn('Event query failed:', e.message);
+        return [];
+      }
+    };
 
     const [hbEvents, trigEvents, claimEvents, depEvents, revokeEvents, beneEvents] = await Promise.all([
-      safeQuery(rc.filters.Heartbeat()),
-      safeQuery(rc.filters.WillTriggered()),
-      safeQuery(rc.filters.Claimed()),
-      safeQuery(rc.filters.Deposited()),
-      safeQuery(rc.filters.Revoked()),
-      safeQuery(rc.filters.BeneficiariesUpdated()),
+      safeQuery(() => rc.filters.Heartbeat()),
+      safeQuery(() => rc.filters.WillTriggered()),
+      safeQuery(() => rc.filters.Claimed()),
+      safeQuery(() => rc.filters.Deposited()),
+      safeQuery(() => rc.filters.Revoked()),
+      safeQuery(() => rc.filters.BeneficiariesUpdated()),
     ]);
 
     const all = [
