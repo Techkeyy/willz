@@ -1006,9 +1006,10 @@ select.form-input { cursor: pointer; }
           <div class="form-hint">PAS tokens locked in your vault on deploy. You can add more later via Deposit. Leave 0 to start empty.</div>
         </div>
       </div>
-      <div style="display:flex;gap:10px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
-        <button class="btn btn-pink" onclick="deployW()">Deploy Will Contract →</button>
+        <button class="btn btn-pink" id="deployBtn" onclick="deployW()">Deploy Will Contract →</button>
+        <button class="btn btn-outline-pink" id="updateBenesBtn" onclick="updateBenes()" style="display:none;">Save Beneficiary Changes →</button>
       </div>
     </div>
   </div>
@@ -1653,6 +1654,12 @@ function showNoWillState() {
   // Show setup prompt card
   const setupPrompt = document.getElementById('setupPrompt');
   if (setupPrompt) setupPrompt.style.display = 'block';
+
+  // Restore deploy button, hide update button
+  const deployBtn      = document.getElementById('deployBtn');
+  const updateBenesBtn = document.getElementById('updateBenesBtn');
+  if (deployBtn)      deployBtn.style.display      = 'inline-flex';
+  if (updateBenesBtn) updateBenesBtn.style.display  = 'none';
 }
 
 // ─── UI STATE: HAS WILL ────────────────────────────────────────────────────
@@ -1672,6 +1679,12 @@ function showHasWillState() {
   document.getElementById('bannerLabel').textContent = 'Loading Will...';
   document.getElementById('bannerLabel').style.color = 'var(--pk-pink)';
   document.getElementById('bannerValue').textContent = 'Fetching your will data from the blockchain...';
+
+  // On setup page — show Update button, hide Deploy button
+  const deployBtn      = document.getElementById('deployBtn');
+  const updateBenesBtn = document.getElementById('updateBenesBtn');
+  if (deployBtn)      deployBtn.style.display      = 'none';
+  if (updateBenesBtn) updateBenesBtn.style.display  = 'inline-flex';
 }
 
 // ─── LOAD DASHBOARD ────────────────────────────────────────────────────────
@@ -1809,18 +1822,22 @@ async function loadHistory() {
     const currentBlock = await rp.getBlockNumber();
     const fromBlock    = Math.max(0, currentBlock - 50000);
 
-    const [hbEvents, trigEvents, claimEvents, depEvents] = await Promise.all([
-      rc.queryFilter(rc.filters.Heartbeat(),     fromBlock),
-      rc.queryFilter(rc.filters.WillTriggered(), fromBlock),
-      rc.queryFilter(rc.filters.Claimed(),       fromBlock),
-      rc.queryFilter(rc.filters.Deposited(),     fromBlock),
+    const [hbEvents, trigEvents, claimEvents, depEvents, revokeEvents, beneEvents] = await Promise.all([
+      rc.queryFilter(rc.filters.Heartbeat(),              fromBlock),
+      rc.queryFilter(rc.filters.WillTriggered(),          fromBlock),
+      rc.queryFilter(rc.filters.Claimed(),                fromBlock),
+      rc.queryFilter(rc.filters.Deposited(),              fromBlock),
+      rc.queryFilter(rc.filters.Revoked(),                fromBlock),
+      rc.queryFilter(rc.filters.BeneficiariesUpdated(),   fromBlock),
     ]);
 
     const all = [
-      ...hbEvents.map(e    => ({ block: e.blockNumber, type:'heartbeat', data: e })),
-      ...trigEvents.map(e  => ({ block: e.blockNumber, type:'triggered', data: e })),
-      ...claimEvents.map(e => ({ block: e.blockNumber, type:'claim',     data: e })),
-      ...depEvents.map(e   => ({ block: e.blockNumber, type:'deposit',   data: e })),
+      ...hbEvents.map(e      => ({ block: e.blockNumber, type:'heartbeat', data: e })),
+      ...trigEvents.map(e    => ({ block: e.blockNumber, type:'triggered', data: e })),
+      ...claimEvents.map(e   => ({ block: e.blockNumber, type:'claim',     data: e })),
+      ...depEvents.map(e     => ({ block: e.blockNumber, type:'deposit',   data: e })),
+      ...revokeEvents.map(e  => ({ block: e.blockNumber, type:'revoked',   data: e })),
+      ...beneEvents.map(e    => ({ block: e.blockNumber, type:'beneupdate',data: e })),
     ].sort((a,b) => b.block - a.block);
 
     if (all.length === 0) {
@@ -1828,14 +1845,16 @@ async function loadHistory() {
       return;
     }
 
-    const icons  = { heartbeat:'♡', triggered:'⚠', claim:'◈', deposit:'↓' };
-    const colors = { heartbeat:'tl-pink', triggered:'tl-gray', claim:'tl-green', deposit:'tl-gray' };
+    const icons  = { heartbeat:'♡', triggered:'⚠', claim:'◈', deposit:'↓', revoked:'✕', beneupdate:'✎' };
+    const colors = { heartbeat:'tl-pink', triggered:'tl-gray', claim:'tl-green', deposit:'tl-gray', revoked:'tl-gray', beneupdate:'tl-gray' };
     feed.innerHTML = all.map(ev => {
       const label = {
-        heartbeat: 'Heartbeat sent',
-        triggered: 'Will triggered',
-        claim:     `Claimed: ${ethers.formatEther(ev.data.args?.amount||0n).slice(0,6)} PAS`,
-        deposit:   `Deposited: ${ethers.formatEther(ev.data.args?.amount||0n).slice(0,6)} PAS`,
+        heartbeat:  'Heartbeat sent',
+        triggered:  'Will triggered',
+        claim:      `Claimed: ${ethers.formatEther(ev.data.args?.amount||0n).slice(0,6)} PAS`,
+        deposit:    `Deposited: ${ethers.formatEther(ev.data.args?.amount||0n).slice(0,6)} PAS`,
+        revoked:    'Will revoked',
+        beneupdate: 'Beneficiaries updated',
       }[ev.type];
       const txHash = ev.data.transactionHash;
       const short  = txHash ? txHash.slice(0,8)+'...'+txHash.slice(-6) : '';
@@ -1863,6 +1882,38 @@ async function refreshDashboard() {
     showToast('✓ Dashboard refreshed!');
   } catch(e) {
     showToast('Refresh failed: ' + e.message, true);
+  }
+}
+
+// ─── UPDATE BENEFICIARIES ON-CHAIN ─────────────────────────────────────────
+async function updateBenes() {
+  if (!walletConnected || !willContract) { showToast('Connect your wallet first.', true); return; }
+
+  const chips = document.querySelectorAll('#bChips .b-chip');
+  if (chips.length === 0) { showToast('Add at least one beneficiary first.', true); return; }
+
+  const wallets = [], shares = [], labels = [];
+  let totalShares = 0;
+  chips.forEach(chip => {
+    wallets.push(chip.dataset.addr);
+    shares.push(parseInt(chip.dataset.share) * 100);
+    labels.push(chip.dataset.label || 'Beneficiary');
+    totalShares += parseInt(chip.dataset.share);
+  });
+
+  if (totalShares !== 100) { showToast(`Shares must total 100%. Currently: ${totalShares}%`, true); return; }
+
+  try {
+    showToast('Saving changes... confirm in MetaMask');
+    const tx = await willContract.updateBeneficiaries(wallets, shares, labels);
+    showToast('Waiting for confirmation...');
+    await tx.wait();
+    showToast('✓ Beneficiaries updated on-chain!');
+    await new Promise(r => setTimeout(r, 3000));
+    await loadDashboard();
+    showPage('dashboard', document.querySelector('.nav-item'));
+  } catch(e) {
+    showToast('Update failed: ' + (e.reason || e.message), true);
   }
 }
 
@@ -2162,6 +2213,8 @@ async function depositPAS() {
     await new Promise(r => setTimeout(r, 3000));
     await loadDashboard();
     showToast('✓ Vault balance updated!');
+    // Refresh history if on that page
+    if (document.getElementById('page-history')?.classList.contains('active')) await loadHistory();
   } catch(e) {
     showToast('Deposit failed: ' + (e.reason || e.message), true);
   }
@@ -2180,7 +2233,11 @@ async function sendHB() {
     showToast('Waiting for confirmation...');
     await tx.wait();
     showToast('♡ Heartbeat confirmed! Timer reset.');
+    // Wait for RPC to index before reloading
+    await new Promise(r => setTimeout(r, 3000));
     await loadDashboard();
+    // Refresh history if on that page
+    if (document.getElementById('page-history')?.classList.contains('active')) await loadHistory();
   } catch(e) {
     showToast('Error: ' + (e.reason || e.message || 'Transaction failed'), true);
   }
