@@ -1679,7 +1679,15 @@ async function loadDashboard() {
   if (!userWillAddress) { showNoWillState(); return; }
   try {
     const s = await readWill.status();
-    const balance     = ethers.formatEther(s.balance);
+    let balance = ethers.formatEther(s.balance);
+
+    // If balance is 0 but we know a deposit was made, retry once after 3s
+    if (parseFloat(balance) === 0 && s.numBeneficiaries > 0) {
+      await new Promise(r => setTimeout(r, 3000));
+      const s2 = await readWill.status();
+      balance = ethers.formatEther(s2.balance);
+    }
+
     const secondsLeft = Number(s.secondsLeft);
 
     document.getElementById('statBalance').textContent  = parseFloat(balance).toFixed(4) + ' PAS';
@@ -1914,11 +1922,16 @@ async function deployW() {
     showHasWillState();
     showPage('dashboard', document.querySelector('.nav-item'));
 
-    // Show clear loading state
-    document.getElementById('statBalance').textContent  = 'Loading...';
+    // Show initial deposit immediately — we already know what was sent
+    const initialBal = depositInput > 0 ? depositInput.toFixed(4) + ' PAS' : '0.0000 PAS';
+    document.getElementById('statBalance').textContent  = initialBal;
     document.getElementById('statInterval').textContent = 'Loading...';
-    document.getElementById('statLastHB').textContent   = 'Loading...';
+    document.getElementById('statLastHB').textContent   = 'Just now';
     document.getElementById('countdown').textContent    = '--:--:--:--';
+    const assetBal = document.getElementById('assetBalance');
+    const assetBalLg = document.getElementById('assetBalanceLarge');
+    if (assetBal)   assetBal.textContent   = initialBal;
+    if (assetBalLg) assetBalLg.textContent = initialBal;
 
     const banner = document.getElementById('statusBanner');
     banner.className = 'status-banner banner-info';
@@ -2141,10 +2154,14 @@ async function depositPAS() {
   try {
     showToast('Depositing ' + amount + ' PAS... confirm in MetaMask');
     const tx = await willContract.deposit({ value: ethers.parseEther(amount.toString()) });
+    showToast('Waiting for confirmation...');
     await tx.wait();
-    showToast('✓ ' + amount + ' PAS deposited to your vault!');
+    showToast('✓ ' + amount + ' PAS deposited!');
     await fetchWalletBalance();
+    // Wait for RPC to index the new balance then reload
+    await new Promise(r => setTimeout(r, 3000));
     await loadDashboard();
+    showToast('✓ Vault balance updated!');
   } catch(e) {
     showToast('Deposit failed: ' + (e.reason || e.message), true);
   }
