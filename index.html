@@ -1270,7 +1270,7 @@ select.form-input { cursor: pointer; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const FACTORY_ADDRESS  = '0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6';
+const FACTORY_ADDRESS  = '0x00Bc1Ff48812A45fe75385Ffb57e0284310B0F1c';
 const CHAIN_ID         = 420420417;
 const CHAIN_ID_HEX     = '0x' + CHAIN_ID.toString(16);
 const RPC_URL          = 'https://eth-rpc-testnet.polkadot.io/';
@@ -1330,6 +1330,7 @@ const WILL_ABI = [
   'function deposit() external payable',
   'function withdraw(uint256 amount) external',
   'function revoke() external',
+  'function updateBeneficiaries(address payable[] memory _wallets, uint256[] memory _shareBps, string[] memory _labels) external',
   'function setEncryptedMessage(string calldata encMsg) external',
   'function getEncryptedMessage() external view returns (string memory)',
   'function hasMessage() external view returns (bool)',
@@ -1564,15 +1565,24 @@ async function checkUserWill() {
   try {
     const willAddr = await readFactory.getWill(walletAddress);
     if (willAddr && willAddr !== ethers.ZeroAddress) {
-      // User already has a will — load it
       userWillAddress = willAddr;
       const rp = new ethers.JsonRpcProvider(RPC_URL);
-      readWill    = new ethers.Contract(willAddr, WILL_ABI, rp);
+      readWill     = new ethers.Contract(willAddr, WILL_ABI, rp);
       willContract = new ethers.Contract(willAddr, WILL_ABI, signer);
-      showHasWillState();
-      await loadDashboard();
+
+      // Check if will is revoked or triggered
+      const isRevoked   = await readWill.revoked();
+      const isTriggered = await readWill.triggered();
+
+      if (isRevoked) {
+        // Will is revoked — factory mapping will auto-clear on next revoke()
+        // But old factory may still point here — show "create new will" state
+        showRevokedWillState();
+      } else {
+        showHasWillState();
+        await loadDashboard();
+      }
     } else {
-      // No will found — guide them to setup
       userWillAddress = null;
       showNoWillState();
     }
@@ -1580,6 +1590,33 @@ async function checkUserWill() {
     console.error('checkUserWill error:', e);
     showNoWillState();
   }
+}
+
+// ─── UI STATE: REVOKED WILL ────────────────────────────────────────────────
+function showRevokedWillState() {
+  const banner = document.getElementById('statusBanner');
+  banner.className = 'status-banner banner-warn';
+  document.getElementById('bannerLabel').textContent = 'Will Revoked';
+  document.getElementById('bannerLabel').style.color = 'var(--amber)';
+  document.getElementById('bannerValue').textContent = 'Your previous will was revoked. You can now create a fresh one.';
+  document.getElementById('countdown').textContent   = '--:--:--:--';
+  document.getElementById('statBalance').textContent  = '0.0000 PAS';
+  document.getElementById('statInterval').textContent = '...';
+  document.getElementById('statLastHB').textContent   = 'Never';
+
+  const beneList = document.getElementById('beneList');
+  if (beneList) beneList.innerHTML = '';
+
+  // Clear factory mapping so setup works
+  userWillAddress = null;
+  willContract    = null;
+  readWill        = null;
+
+  // Show setup prompt
+  const setupPrompt = document.getElementById('setupPrompt');
+  if (setupPrompt) setupPrompt.style.display = 'block';
+
+  showToast('Your previous will was revoked. Create a new one from Setup Will.');
 }
 
 // ─── UI STATE: NO WILL ─────────────────────────────────────────────────────
