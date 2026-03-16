@@ -1277,7 +1277,7 @@ select.form-input { cursor: pointer; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const FACTORY_ADDRESS  = '0x00Bc1Ff48812A45fe75385Ffb57e0284310B0F1c';
+const FACTORY_ADDRESS  = '0xF6F4bFC77c1d3cbbF39802BaBFb6f0Ba90178214';
 const CHAIN_ID         = 420420417;
 const CHAIN_ID_HEX     = '0x' + CHAIN_ID.toString(16);
 const RPC_URL          = 'https://eth-rpc-testnet.polkadot.io/';
@@ -1357,7 +1357,9 @@ const WILL_ABI = [
   'event WillTriggered(address indexed triggeredBy, uint256 timestamp)',
   'event Claimed(address indexed beneficiary, uint256 amount, uint256 shareBps)',
   'event Deposited(address indexed from, uint256 amount)',
-  'event Revoked(address indexed owner, uint256 refundAmount)',
+  'event BeneficiariesUpdated(uint256 count)',
+  'event IntervalUpdated(uint256 newInterval, uint256 newGrace)',
+  'event MessageStored(address indexed owner, uint256 timestamp)',
 ];
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
@@ -1572,24 +1574,42 @@ async function checkUserWill() {
   try {
     const willAddr = await readFactory.getWill(walletAddress);
     if (willAddr && willAddr !== ethers.ZeroAddress) {
-      userWillAddress = willAddr;
       const rp = new ethers.JsonRpcProvider(RPC_URL);
-      readWill     = new ethers.Contract(willAddr, WILL_ABI, rp);
-      willContract = new ethers.Contract(willAddr, WILL_ABI, signer);
+      const tempWill = new ethers.Contract(willAddr, WILL_ABI, rp);
 
-      // Check if will is revoked or triggered
-      const isRevoked   = await readWill.revoked();
-      const isTriggered = await readWill.triggered();
+      // Check if will is dead
+      const isRevoked   = await tempWill.revoked();
+      const isTriggered = await tempWill.triggered();
 
       if (isRevoked) {
-        // Will is revoked — factory mapping will auto-clear on next revoke()
-        // But old factory may still point here — show "create new will" state
+        // Will is revoked — clear local state and let user deploy fresh
+        // Try to clear factory mapping if it hasn't been cleared yet
+        userWillAddress = null;
+        willContract    = null;
+        readWill        = null;
         showRevokedWillState();
-      } else {
+        return;
+      }
+
+      if (isTriggered) {
+        // Will triggered — load dashboard to show claim state
+        userWillAddress = willAddr;
+        readWill        = tempWill;
+        willContract    = new ethers.Contract(willAddr, WILL_ABI, signer);
         showHasWillState();
         await loadDashboard();
+        return;
       }
+
+      // Active will — load normally
+      userWillAddress = willAddr;
+      readWill        = tempWill;
+      willContract    = new ethers.Contract(willAddr, WILL_ABI, signer);
+      showHasWillState();
+      await loadDashboard();
+
     } else {
+      // No will found
       userWillAddress = null;
       showNoWillState();
     }
@@ -1822,13 +1842,15 @@ async function loadHistory() {
     const currentBlock = await rp.getBlockNumber();
     const fromBlock    = Math.max(0, currentBlock - 50000);
 
+    const safeQuery = async (filter) => { try { return await rc.queryFilter(filter, fromBlock); } catch(e) { return []; } };
+
     const [hbEvents, trigEvents, claimEvents, depEvents, revokeEvents, beneEvents] = await Promise.all([
-      rc.queryFilter(rc.filters.Heartbeat(),              fromBlock),
-      rc.queryFilter(rc.filters.WillTriggered(),          fromBlock),
-      rc.queryFilter(rc.filters.Claimed(),                fromBlock),
-      rc.queryFilter(rc.filters.Deposited(),              fromBlock),
-      rc.queryFilter(rc.filters.Revoked(),                fromBlock),
-      rc.queryFilter(rc.filters.BeneficiariesUpdated(),   fromBlock),
+      safeQuery(rc.filters.Heartbeat()),
+      safeQuery(rc.filters.WillTriggered()),
+      safeQuery(rc.filters.Claimed()),
+      safeQuery(rc.filters.Deposited()),
+      safeQuery(rc.filters.Revoked()),
+      safeQuery(rc.filters.BeneficiariesUpdated()),
     ]);
 
     const all = [
@@ -2246,15 +2268,55 @@ async function sendHB() {
 // ─── REVOKE ────────────────────────────────────────────────────────────────
 async function revokeWill() {
   if (!walletConnected || !willContract) { alert('Connect wallet first.'); return; }
-  if (!confirm('⚠ Permanently revoke your will and refund balance?\n\nThis CANNOT be undone.')) return;
+  if (!confirm('⚠ Permanently revoke your will?\n\nAll locked PAS will be refunded to your wallet.\n\nThis CANNOT be undone.')) return;
   try {
-    showToast('Revoking... confirm in MetaMask');
+    showToast('Revoking will... confirm in MetaMask');
+
+    // Snapshot balance before revoke
+    const balBefore = window._walletBalPAS || 0;
+
     const tx = await willContract.revoke();
+    showToast('Waiting for confirmation...');
     await tx.wait();
-    userWillAddress = null; willContract = null; readWill = null;
-    showToast('Will revoked. Balance refunded.');
+
+    showToast('✓ Will revoked. Waiting for refund...');
+
+    // Wait for refund to land — check up to 10 times every 3s
+    let refundLanded = false;
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        await fetchWalletBalance();
+        const balAfter = window._walletBalPAS || 0;
+        if (balAfter > balBefore + 0.001) {
+          refundLanded = true;
+          showToast(`✓ Refund received! Balance: ${balAfter.toFixed(4)} PAS`);
+          break;
+        }
+      } catch(e) {}
+    }
+    if (!refundLanded) {
+      await fetchWalletBalance();
+      showToast('Will revoked. Refund may take a few more seconds to appear.');
+    }
+
+    // Fully reset will state
+    userWillAddress = null;
+    willContract    = null;
+    readWill        = null;
+
+    // Re-initialise factory contracts so deployW works immediately
+    const rp = new ethers.JsonRpcProvider(RPC_URL);
+    readFactory     = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, rp);
+    factoryContract = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, signer);
+
     showNoWillState();
-  } catch(e) { showToast('Error: ' + (e.reason || e.message), true); }
+    showPage('dashboard', document.querySelector('.nav-item'));
+    showToast('✓ Ready to create a new will. Go to Setup Will.');
+
+  } catch(e) {
+    showToast('Revoke failed: ' + (e.reason || e.message), true);
+  }
 }
 
 // ─── STEPPER ───────────────────────────────────────────────────────────────
