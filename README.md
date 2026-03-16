@@ -1,8 +1,8 @@
-# DotWill — On-Chain Inheritance on Polkadot Hub
+# Willz — On-Chain Inheritance on Polkadot Hub
 
 > **Polkadot Solidity Hackathon 2026** | Track: EVM Smart Contract — AI-powered dApp
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-dotwill.vercel.app-E6007A?style=flat&logo=vercel&logoColor=white)](https://dotwill.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-willz.vercel.app-E6007A?style=flat&logo=vercel&logoColor=white)](https://dotwill.vercel.app)
 [![Polkadot Hub](https://img.shields.io/badge/Deployed%20on-Polkadot%20Hub%20TestNet-E6007A?style=flat&logo=polkadot&logoColor=white)](https://blockscout-testnet.polkadot.io/address/0xbB4797c9E49Ce80FF64652aC322ccC8F4C0161C6)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20-363636?style=flat&logo=solidity)](https://soliditylang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 ## Live Demo
 
-🌐 **[dotwill.vercel.app](https://dotwill.vercel.app)**
+🌐 **[willz.vercel.app](https://willz.vercel.app/)**
 
 > Requires MetaMask. The app automatically adds Polkadot Hub TestNet and prompts for test PAS tokens.
 > Get free PAS tokens at [faucet.polkadot.io](https://faucet.polkadot.io/?parachain=1000)
@@ -22,13 +22,13 @@
 
 An estimated **$140 billion in crypto** is permanently lost every year because owners die without a succession plan. No wallet in the world has solved this cleanly. There is no on-chain way to say *"if I stop responding, send my assets to my family."*
 
-DotWill solves this.
+Willz solves this.
 
 ---
 
-## What is DotWill?
+## What is Willz?
 
-DotWill is a decentralized inheritance protocol built with Solidity on Polkadot Hub. It uses a **heartbeat dead man's switch** — you check in regularly to prove you're alive. If you stop, the contract automatically unlocks and your beneficiaries can claim their share.
+Willz is a decentralized inheritance protocol built with Solidity on Polkadot Hub. It uses a **heartbeat dead man's switch** — you check in regularly to prove you're alive. If you stop, the contract automatically unlocks and your beneficiaries can claim their share.
 
 No lawyers. No banks. No middlemen. Just code.
 
